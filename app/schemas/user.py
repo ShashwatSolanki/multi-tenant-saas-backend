@@ -1,11 +1,10 @@
-from pydantic import BaseModel, EmailStr
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=72)
     organization_id: UUID
 
 
