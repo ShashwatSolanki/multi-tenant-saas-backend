@@ -10,6 +10,8 @@ from app.core.security import hash_password
 from app.schemas.user import UserCreate, UserResponse
 from app.models.organization import Organization
 
+from app.core.security import get_current_user
+
 router = APIRouter()
 
 
@@ -20,6 +22,13 @@ def get_db():
     finally:
         db.close()
 
+@router.get("/me")
+def read_me(current_user = Depends(get_current_user)):
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "organization_id": str(current_user.organization_id)
+    }
 
 @router.post("/login")
 def login(user_data: UserLogin, db: Session = Depends(get_db)):
