@@ -8,7 +8,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
 
-        if request.url.path.startswith("/api/routes/auth"):
+        if request.url.path.startswith("/auth") or request.url.path in ["/health", "/docs", "/openapi.json"]:
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization")
