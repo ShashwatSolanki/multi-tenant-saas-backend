@@ -3,9 +3,7 @@ from sqlalchemy import text
 from app.db.base import engine
 
 app = FastAPI()
-
-
-
+ 
 @app.get("/db-test")
 async def db_test():
     with engine.connect() as conn:
