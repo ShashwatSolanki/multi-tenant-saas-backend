@@ -1,147 +1,85 @@
-# Multi-Tenant SaaS Backend Architecture
+# Project Aegis — Multi-Tenant SaaS Backend
 
-## 📌 Overview
+Project Aegis is a working, resume-grade multi-tenant project-management backend built around the original architecture: **shared PostgreSQL database, shared schema, UUID identifiers, JWT authentication, RBAC, middleware tenant context, tenant-scoped queries, and audit logging**.
 
-This project demonstrates the design of a **scalable multi-tenant SaaS backend** where multiple organizations (tenants) operate on a shared infrastructure while maintaining **strict data isolation and security**.
+## Architecture
 
-The focus of this project is on **architecture and system design**, following real-world SaaS patterns used in production systems.
+Client → FastAPI → JWT Authentication → Tenant Context Middleware → RBAC → Business/API Layer → SQLAlchemy → PostgreSQL
 
----
+The database uses a shared-schema model. Every tenant-owned resource carries a tenant discriminator and protected queries explicitly constrain records to the authenticated user's `tenant_id`.
 
-## 🎯 Key Objectives
+## Implemented Features
 
-- Support multiple organizations on shared infrastructure
-- Enforce strict tenant-level data isolation
-- Implement secure authentication and authorization
-- Design a scalable, maintainable backend architecture
+- Tenant registration with an initial Owner account
+- JWT login and stateless authentication
+- Owner / Admin / Member RBAC
+- Tenant context middleware
+- Tenant-isolated project listing and lookup
+- Project creation with same-tenant manager validation
+- Project tasks with same-tenant assignee validation
+- Task status and priority updates
+- Task comments
+- Audit logs for project, task, and comment mutations
+- Soft-delete fields on users
+- SQLAlchemy UUID-based domain model
+- PostgreSQL Docker development stack
+- API health and database connectivity endpoints
+- Automated API tests covering authentication, CRUD flow, and tenant isolation
+- Interactive OpenAPI documentation at `/docs`
 
----
+## Database Model
 
-## 🧱 High-Level Architecture
+The schema follows the original design: Tenant, Role, User, Project, ProjectMember, Task, Comment, and AuditLog. Projects belong to a tenant, tasks belong to projects, comments belong to tasks, and audit logs record who performed an action and on which entity.
 
-The system follows a layered architecture with strong middleware-driven enforcement of security and tenant isolation.
+## Run locally with Docker
 
-<p align="center">
-  <img src="docs/images/hld.png" alt="High-Level Architecture" width="750"/>
-</p>
+```bash
+git clone https://github.com/ShashwatSolanki/multi-tenant-saas-backend.git
+cd multi-tenant-saas-backend
+docker compose up --build
+```
 
-**Core Layers**
+Then open `http://localhost:8000/docs` and use the API interactively.
 
-- Client Layer
-- API Controller Layer
-- Authentication Middleware (JWT)
-- Tenant Resolution Middleware
-- Authorization Middleware (RBAC)
-- Service / Business Logic Layer
-- Data Access Layer
-- PostgreSQL Database
+## Run locally without Docker
 
----
+Create a virtual environment, install `requirements.txt`, and configure `.env` using `.env.example`.
 
-## 🔐 Authentication & Authorization
+For a quick local demo, the application defaults to SQLite when `DATABASE_URL` is not supplied. For the intended deployment architecture, use PostgreSQL.
 
-- Stateless **JWT-based authentication**
-- **Role-Based Access Control (RBAC)** to restrict operations by role
-- JWT payload includes:
-  - `user_id`
-  - `tenant_id`
-  - `role`
+```bash
+uvicorn app.main:app --reload
+```
 
-Unauthorized or unauthenticated requests are rejected early in the request lifecycle.
+## Core API
 
----
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/v1/auth/register` | Create tenant + Owner |
+| POST | `/api/v1/auth/login` | Obtain JWT |
+| GET | `/api/v1/me` | Current authenticated user |
+| POST | `/api/v1/projects` | Create project (Owner/Admin) |
+| GET | `/api/v1/projects` | List current tenant projects |
+| GET | `/api/v1/projects/{project_id}` | Get tenant-scoped project |
+| POST | `/api/v1/projects/{project_id}/tasks` | Create task |
+| GET | `/api/v1/projects/{project_id}/tasks` | List project tasks |
+| PATCH | `/api/v1/tasks/{task_id}` | Update task |
+| POST | `/api/v1/tasks/{task_id}/comments` | Add comment |
+| GET | `/api/v1/tasks/{task_id}/comments` | List comments |
+| GET | `/api/v1/audit-logs` | Owner/Admin audit view |
 
-## 🏢 Multi-Tenancy & Data Isolation
+## Security / Tenant Isolation
 
-This system uses a **shared-database, shared-schema** multi-tenancy model.
+A JWT carries `user_id`, `tenant_id`, and `role`. On protected requests, the API validates the token and then loads the user using **both user ID and tenant ID**. Tenant-owned database reads and writes additionally constrain the tenant ID. Cross-tenant project, task, comment, manager, and assignee access therefore returns `404` or `400` instead of exposing another tenant's data.
 
-**Isolation Strategy**
+## Tests
 
-- Every request is resolved to exactly one tenant
-- Tenant context is enforced via middleware
-- All database queries are scoped using a `tenant_id` discriminator
-- Cross-tenant data access is prevented by design
+```bash
+pytest -q
+```
 
----
+The test suite verifies registration/login, the project → task → comment flow, and that a second tenant cannot see the first tenant's projects.
 
-## 🔁 Request Workflow
+## Project Status
 
-The following workflow illustrates how a request is processed end-to-end in a tenant-aware manner.
-
-<p align="center">
-  <img src="docs/images/workflow.png" alt="Request Workflow" width="750"/>
-</p>
-
-**Workflow Steps**
-
-1. Client sends request with JWT token
-2. JWT is validated
-3. Tenant context is resolved
-4. RBAC permissions are verified
-5. Business logic executes with tenant scope
-6. Tenant-scoped database queries are executed
-7. Response is returned to the client
-
----
-
-## 🔄 Sequence Diagram
-
-The sequence diagram below shows the **exact execution order** of components for a tenant-scoped API request, highlighting authentication, tenant resolution, authorization, and database access.
-
-<p align="center">
-  <img src="docs/images/sequence.png" alt="Sequence Diagram" width="750"/>
-</p>
-
-This diagram clearly demonstrates how tenant isolation is preserved throughout the request lifecycle.
-
----
-
-## 🛢️ Database Design
-
-- PostgreSQL is used as the primary database
-- Shared tables with tenant discrimination
-- Normalized schema for data integrity
-- Designed to support horizontal scaling with stateless APIs
-
----
-
-## ⚙️ Tech Stack
-
-- **Backend:** (as finalized on Day 1)
-- **Authentication:** JWT
-- **Authorization:** RBAC
-- **Database:** PostgreSQL
-- **Architecture Style:** Layered Monolithic (SaaS-ready)
-
----
-
-## 🚀 Scalability Considerations
-
-The architecture supports:
-
-- Horizontal scaling of API services
-- Easy integration of caching layers
-- Background job processing
-- Read replicas for database scaling
-
-The system is designed to evolve without major architectural changes.
-
----
-
-## 📈 Why This Project
-
-This project highlights:
-
-- Real-world SaaS architecture design
-- Secure backend engineering practices
-- Strong separation of concerns
-- Interview-ready system design documentation
-
-This is a **resume-grade backend architecture project**, not a basic CRUD application.
-
----
-
-## 📌 Current Status
-
-Architecture and design phase complete.  
-Implementation will follow with Low-Level Design (LLD) and database schema definition.
+**Implementation complete for the defined Aegis MVP architecture and schema.** The repository is runnable and exposes an interactive FastAPI/OpenAPI surface for demonstration and evaluation.
