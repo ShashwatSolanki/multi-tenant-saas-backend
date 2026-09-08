@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -10,8 +10,8 @@ from app.db.session import get_db
 from app.models.models import AuditLog, Comment, Project, ProjectMember, Role, Task, Tenant, User
 from app.schemas import (
     CommentCreate, CommentResponse, LoginRequest, ProjectCreate, ProjectResponse,
-    RegisterRequest, TaskCreate, TaskResponse, TaskUpdate, TokenResponse, UserCreate,
-    UserResponse,
+    RegisterRequest, TaskCreate, TaskResponse, TaskUpdate, TenantResponse, TokenResponse,
+    UserCreate, UserResponse,
 )
 
 router = APIRouter()
@@ -54,6 +54,25 @@ def me(user: User = Depends(get_current_user)):
     return {"user_id": user.user_id, "tenant_id": user.tenant_id, "email": user.email, "full_name": user.full_name, "role": user.role.name}
 
 
+@router.get("/tenant", response_model=TenantResponse)
+def get_tenant(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    tenant = db.scalar(select(Tenant).where(Tenant.tenant_id == user.tenant_id))
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    member_count = db.scalar(select(func.count(User.user_id)).where(User.tenant_id == tenant.tenant_id, User.deleted_at.is_(None))) or 0
+    return TenantResponse(
+        tenant_id=tenant.tenant_id,
+        name=tenant.name,
+        description=tenant.description,
+        member_count=member_count,
+        verification={
+            "tenant_exists": True,
+            "user_belongs_to_tenant": user.tenant_id == tenant.tenant_id,
+            "database_tenant_match": True,
+        },
+    )
+
+
 @router.post("/users", response_model=UserResponse, status_code=201)
 def create_user(data: UserCreate, db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
     if db.scalar(select(User).where(User.email == data.email.lower())):
@@ -61,6 +80,8 @@ def create_user(data: UserCreate, db: Session = Depends(get_db), user: User = De
     if data.role == "Admin" and user.role.name != "Owner":
         raise HTTPException(403, "Only Owners can create Admin users")
     role = db.scalar(select(Role).where(Role.name == data.role))
+    if not role:
+        raise HTTPException(400, "Invalid role")
     new_user = User(tenant_id=user.tenant_id, role_id=role.role_id, email=data.email.lower(), hashed_password=hash_password(data.password), full_name=data.full_name)
     db.add(new_user)
     db.flush()
@@ -104,7 +125,7 @@ def get_project(project_id: UUID, db: Session = Depends(get_db), user: User = De
 
 
 @router.post("/projects/{project_id}/tasks", response_model=TaskResponse, status_code=201)
-def create_task(project_id: UUID, data: TaskCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def create_task(project_id: UUID, data: TaskCreate, db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
     project = db.scalar(select(Project).where(Project.project_id == project_id, Project.tenant_id == user.tenant_id))
     if not project:
         raise HTTPException(404, "Project not found")
