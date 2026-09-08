@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.routes import router
+from app.api.user_admin import router as user_admin_router
 from app.db.base import engine
 from app.db.init import init_db
 from app.middleware.tenant import TenantContextMiddleware
@@ -18,6 +19,7 @@ app.add_middleware(
 )
 app.add_middleware(TenantContextMiddleware)
 app.include_router(router, prefix="/api/v1")
+app.include_router(user_admin_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
