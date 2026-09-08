@@ -40,6 +40,14 @@ class UserResponse(BaseModel):
     role: str
 
 
+class TenantResponse(BaseModel):
+    tenant_id: UUID
+    name: str
+    description: str | None
+    member_count: int
+    verification: dict[str, bool]
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     description: str | None = None
