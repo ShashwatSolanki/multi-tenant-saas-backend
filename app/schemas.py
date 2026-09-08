@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.models import ProjectStatus, TaskPriority, TaskStatus
 
@@ -9,12 +9,12 @@ from app.models.models import ProjectStatus, TaskPriority, TaskStatus
 class RegisterRequest(BaseModel):
     tenant_name: str = Field(min_length=2, max_length=120)
     full_name: str = Field(min_length=2, max_length=120)
-    email: EmailStr
+    email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=128)
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -27,7 +27,7 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     user_id: UUID
     tenant_id: UUID
-    email: EmailStr
+    email: str
     full_name: str
     role: str
 
