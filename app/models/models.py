@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -102,6 +102,15 @@ class Task(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     project: Mapped["Project"] = relationship(back_populates="tasks")
     comments: Mapped[list["Comment"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+    collaborators: Mapped[list["TaskMember"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+
+
+class TaskMember(Base):
+    __tablename__ = "task_members"
+    task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.task_id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    task: Mapped["Task"] = relationship(back_populates="collaborators")
 
 
 class Comment(Base):

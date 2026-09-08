@@ -72,10 +72,23 @@ class ProjectResponse(BaseModel):
     created_at: datetime
 
 
+class ProjectMemberCreate(BaseModel):
+    user_id: UUID
+
+
+class ProjectMemberResponse(BaseModel):
+    user_id: UUID
+    full_name: str
+    email: str
+    role: str
+    joined_at: datetime
+
+
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str | None = None
     assignee_id: UUID | None = None
+    collaborator_ids: list[UUID] = Field(default_factory=list, max_length=50)
     priority: TaskPriority = TaskPriority.MEDIUM
 
 
@@ -83,21 +96,25 @@ class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     assignee_id: UUID | None = None
-    status: TaskStatus | None = None
     priority: TaskPriority | None = None
+    status: TaskStatus | None = None
 
 
 class TaskResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
     task_id: UUID
     project_id: UUID
     assignee_id: UUID | None
+    collaborator_ids: list[UUID]
     title: str
     description: str | None
     status: TaskStatus
     priority: TaskPriority
     created_by: UUID
     created_at: datetime
+
+
+class TaskCollaboratorsUpdate(BaseModel):
+    user_ids: list[UUID] = Field(default_factory=list, max_length=50)
 
 
 class CommentCreate(BaseModel):
