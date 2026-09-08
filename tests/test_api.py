@@ -41,6 +41,8 @@ def test_owner_can_change_workspace_roles_but_members_cannot(client):
     changed = client.patch(f"/api/v1/users/{member_id}", headers=owner, json={"role":"Admin"})
     assert changed.status_code == 200 and changed.json()["role"] == "Admin"
     assert client.patch(f"/api/v1/users/{member_id}", headers=auth_headers(client,"admin@acme.test","password123"), json={"role":"Member"}).status_code == 403
+    restored = client.patch(f"/api/v1/users/{member_id}", headers=owner, json={"role":"Member"})
+    assert restored.status_code == 200 and restored.json()["role"] == "Member"
 
 def test_project_lifecycle_and_task_flow(client):
     headers = auth_headers(client,"owner@acme.test","password123")
