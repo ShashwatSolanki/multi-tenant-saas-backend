@@ -2,7 +2,7 @@
 
 Project Aegis is a multi-tenant project-management SaaS application built around the original Aegis architecture: **shared PostgreSQL database, shared schema, UUID identifiers, JWT authentication, RBAC, tenant-context middleware, tenant-scoped queries, and audit logging**.
 
-The repository now contains both the **FastAPI backend** and a lightweight **React/Vite GUI** for demonstrating the system end-to-end.
+The repository contains both the **FastAPI backend** and a lightweight **React/Vite GUI** for demonstrating the system end-to-end.
 
 ## Architecture
 
@@ -45,12 +45,12 @@ The original architecture diagrams and schema document are retained under `docs/
 
 ### GUI
 
-The frontend is located in `frontend/` and provides a simple demonstration dashboard:
+The frontend is located in `frontend/` and provides a simple end-to-end demonstration dashboard:
 
 - Login / registration
 - Tenant workspace dashboard
-- Projects view
-- Task board
+- Project creation and project listing
+- Task creation and task board
 - Team and role view
 - Audit log view
 - Sign out
@@ -93,8 +93,6 @@ The complete original schema is documented in [`docs/schema_v1.md`](docs/schema_
 ```
 
 ## Run the Complete Application with Docker
-
-Clone the repository and start all services:
 
 ```bash
 git clone https://github.com/ShashwatSolanki/multi-tenant-saas-backend.git
@@ -169,7 +167,7 @@ This means a user from Tenant B cannot access Tenant A's projects, tasks, commen
 
 ## Tests
 
-Run the complete backend test suite with:
+Run the backend test suite with:
 
 ```bash
 python -m pytest -q
@@ -185,11 +183,11 @@ The tests cover:
 6. Comment creation
 7. Cross-tenant project isolation
 
-GitHub Actions runs the same test suite automatically on pushes and pull requests targeting `main`.
+GitHub Actions runs the backend test suite and a production frontend build automatically on pushes and pull requests targeting `main`.
 
 ## Test Run / Screenshots
 
-The repository includes the architecture diagrams above as the stable project documentation. **Runtime screenshots should be captured from the locally running application rather than fabricated in documentation.**
+Runtime screenshots should be captured from the locally running application rather than fabricated in documentation.
 
 Recommended screenshots for a project/demo report are:
 
@@ -200,13 +198,17 @@ Recommended screenshots for a project/demo report are:
 5. Team page showing Owner/Admin/Member roles
 6. Audit log page
 7. Swagger `/docs` page
-8. Terminal showing a successful `pytest -q` run
+8. Terminal showing a successful `python -m pytest -q` run
+9. GitHub Actions page showing the green Aegis CI workflow
 
-After running the stack locally, these can be added under `docs/images/screenshots/` and referenced here without changing the application architecture.
+After running the stack locally, place real screenshots under `docs/images/screenshots/` and reference them from this section if desired. This keeps the repository evidence authentic and tied to an actual run.
 
 ## CI
 
-The project uses GitHub Actions for automated backend tests. The workflow installs the pinned Python dependencies and executes `python -m pytest -q` with the repository root on `PYTHONPATH` so the `app` package is resolved reliably in the runner.
+The GitHub Actions workflow has two checks:
+
+- **Backend:** installs the Python dependencies and runs `python -m pytest -q` with `PYTHONPATH=.` so the `app` package is resolved reliably in the runner.
+- **Frontend:** installs the React/Vite dependencies with Node.js 22 and runs `npm run build` to catch GUI compilation errors.
 
 ## Original Design Documents
 
@@ -214,7 +216,7 @@ The original Aegis design material remains available in `docs/`:
 
 - `docs/schema_v1.md` — schema and entity design
 - `docs/images/hld.png` — high-level architecture
-- `docs/images/workflow.png` — request/workflow diagram
+- `docs/images/workflow.png` — workflow/request flow
 - `docs/images/sequence.png` — sequence diagram
 
 These documents describe the foundation on which the implementation was completed.
