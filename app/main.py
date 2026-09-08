@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+# Import registers SQLAlchemy's active-user assignment guard before requests run.
+import app.core.active_assignment_guard  # noqa: F401
 from app.api.access_control import router as access_control_router
 from app.api.routes import router
 from app.api.user_admin import router as user_admin_router
@@ -19,9 +21,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(TenantContextMiddleware)
-
-# Register scoped GET/PATCH routes before the legacy/general routes so the
-# same public API paths apply the stricter Member visibility policy.
 app.include_router(access_control_router, prefix="/api/v1")
 app.include_router(router, prefix="/api/v1")
 app.include_router(user_admin_router, prefix="/api/v1")
