@@ -54,6 +54,13 @@ class ProjectCreate(BaseModel):
     manager_id: UUID | None = None
 
 
+class ProjectUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    manager_id: UUID | None = None
+    status: ProjectStatus | None = None
+
+
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     project_id: UUID

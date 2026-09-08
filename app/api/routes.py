@@ -10,8 +10,8 @@ from app.db.session import get_db
 from app.models.models import AuditLog, Comment, Project, ProjectMember, Role, Task, Tenant, User
 from app.schemas import (
     CommentCreate, CommentResponse, LoginRequest, ProjectCreate, ProjectResponse,
-    RegisterRequest, TaskCreate, TaskResponse, TaskUpdate, TenantResponse, TokenResponse,
-    UserCreate, UserResponse,
+    ProjectUpdate, RegisterRequest, TaskCreate, TaskResponse, TaskUpdate,
+    TenantResponse, TokenResponse, UserCreate, UserResponse,
 )
 
 router = APIRouter()
@@ -19,6 +19,10 @@ router = APIRouter()
 
 def audit(db: Session, user: User, action: str, entity_type: str, entity_id: UUID, description: str) -> None:
     db.add(AuditLog(user_id=user.user_id, action=action, entity_type=entity_type, entity_id=entity_id, description=description))
+
+
+def same_tenant_user(db: Session, user_id: UUID, tenant_id: UUID) -> User | None:
+    return db.scalar(select(User).where(User.user_id == user_id, User.tenant_id == tenant_id, User.deleted_at.is_(None)))
 
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=201)
@@ -60,17 +64,7 @@ def get_tenant(db: Session = Depends(get_db), user: User = Depends(get_current_u
     if not tenant:
         raise HTTPException(404, "Tenant not found")
     member_count = db.scalar(select(func.count(User.user_id)).where(User.tenant_id == tenant.tenant_id, User.deleted_at.is_(None))) or 0
-    return TenantResponse(
-        tenant_id=tenant.tenant_id,
-        name=tenant.name,
-        description=tenant.description,
-        member_count=member_count,
-        verification={
-            "tenant_exists": True,
-            "user_belongs_to_tenant": user.tenant_id == tenant.tenant_id,
-            "database_tenant_match": True,
-        },
-    )
+    return TenantResponse(tenant_id=tenant.tenant_id, name=tenant.name, description=tenant.description, member_count=member_count, verification={"tenant_exists": True, "user_belongs_to_tenant": user.tenant_id == tenant.tenant_id, "database_tenant_match": True})
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
@@ -99,7 +93,7 @@ def list_users(db: Session = Depends(get_db), user: User = Depends(get_current_u
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
 def create_project(data: ProjectCreate, db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
-    if data.manager_id and not db.scalar(select(User).where(User.user_id == data.manager_id, User.tenant_id == user.tenant_id, User.deleted_at.is_(None))):
+    if data.manager_id and not same_tenant_user(db, data.manager_id, user.tenant_id):
         raise HTTPException(400, "Manager must belong to the same tenant")
     project = Project(tenant_id=user.tenant_id, manager_id=data.manager_id, name=data.name, description=data.description)
     db.add(project)
@@ -124,12 +118,43 @@ def get_project(project_id: UUID, db: Session = Depends(get_db), user: User = De
     return project
 
 
+@router.patch("/projects/{project_id}", response_model=ProjectResponse)
+def update_project(project_id: UUID, data: ProjectUpdate, db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
+    project = db.scalar(select(Project).where(Project.project_id == project_id, Project.tenant_id == user.tenant_id))
+    if not project:
+        raise HTTPException(404, "Project not found")
+    if project.status == "archived" and any(value is not None for value in data.model_dump(exclude_unset=True).values()):
+        raise HTTPException(409, "Archived projects cannot be edited")
+    if data.manager_id is not None and not same_tenant_user(db, data.manager_id, user.tenant_id):
+        raise HTTPException(400, "Manager must belong to the same tenant")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(project, field, value)
+    audit(db, user, "update", "project", project.project_id, f"Updated project {project.name}")
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+@router.post("/projects/{project_id}/archive", response_model=ProjectResponse)
+def archive_project(project_id: UUID, db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
+    project = db.scalar(select(Project).where(Project.project_id == project_id, Project.tenant_id == user.tenant_id))
+    if not project:
+        raise HTTPException(404, "Project not found")
+    project.status = "archived"
+    audit(db, user, "archive", "project", project.project_id, f"Archived project {project.name}")
+    db.commit()
+    db.refresh(project)
+    return project
+
+
 @router.post("/projects/{project_id}/tasks", response_model=TaskResponse, status_code=201)
 def create_task(project_id: UUID, data: TaskCreate, db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
     project = db.scalar(select(Project).where(Project.project_id == project_id, Project.tenant_id == user.tenant_id))
     if not project:
         raise HTTPException(404, "Project not found")
-    if data.assignee_id and not db.scalar(select(User).where(User.user_id == data.assignee_id, User.tenant_id == user.tenant_id, User.deleted_at.is_(None))):
+    if project.status == "archived":
+        raise HTTPException(409, "Archived projects cannot receive new tasks")
+    if data.assignee_id and not same_tenant_user(db, data.assignee_id, user.tenant_id):
         raise HTTPException(400, "Assignee must belong to the same tenant")
     task = Task(project_id=project.project_id, assignee_id=data.assignee_id, title=data.title, description=data.description, priority=data.priority, created_by=user.user_id)
     db.add(task)
@@ -154,7 +179,7 @@ def update_task(task_id: UUID, data: TaskUpdate, db: Session = Depends(get_db), 
         raise HTTPException(404, "Task not found")
     if user.role.name == "Member" and task.assignee_id != user.user_id and task.created_by != user.user_id:
         raise HTTPException(403, "Members may only update their own tasks")
-    if data.assignee_id and not db.scalar(select(User).where(User.user_id == data.assignee_id, User.tenant_id == user.tenant_id, User.deleted_at.is_(None))):
+    if data.assignee_id and not same_tenant_user(db, data.assignee_id, user.tenant_id):
         raise HTTPException(400, "Assignee must belong to the same tenant")
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(task, field, value)
