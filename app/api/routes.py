@@ -10,7 +10,8 @@ from app.db.session import get_db
 from app.models.models import AuditLog, Comment, Project, ProjectMember, Role, Task, Tenant, User
 from app.schemas import (
     CommentCreate, CommentResponse, LoginRequest, ProjectCreate, ProjectResponse,
-    RegisterRequest, TaskCreate, TaskResponse, TaskUpdate, TokenResponse, UserResponse,
+    RegisterRequest, TaskCreate, TaskResponse, TaskUpdate, TokenResponse, UserCreate,
+    UserResponse,
 )
 
 router = APIRouter()
@@ -51,6 +52,28 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 def me(user: User = Depends(get_current_user)):
     return {"user_id": user.user_id, "tenant_id": user.tenant_id, "email": user.email, "full_name": user.full_name, "role": user.role.name}
+
+
+@router.post("/users", response_model=UserResponse, status_code=201)
+def create_user(data: UserCreate, db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
+    if db.scalar(select(User).where(User.email == data.email.lower())):
+        raise HTTPException(409, "Email already registered")
+    if data.role == "Admin" and user.role.name != "Owner":
+        raise HTTPException(403, "Only Owners can create Admin users")
+    role = db.scalar(select(Role).where(Role.name == data.role))
+    new_user = User(tenant_id=user.tenant_id, role_id=role.role_id, email=data.email.lower(), hashed_password=hash_password(data.password), full_name=data.full_name)
+    db.add(new_user)
+    db.flush()
+    audit(db, user, "create", "user", new_user.user_id, f"Created {data.role} user {new_user.email}")
+    db.commit()
+    db.refresh(new_user)
+    return {"user_id": new_user.user_id, "tenant_id": new_user.tenant_id, "email": new_user.email, "full_name": new_user.full_name, "role": role.name}
+
+
+@router.get("/users", response_model=list[UserResponse])
+def list_users(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    users = db.scalars(select(User).where(User.tenant_id == user.tenant_id, User.deleted_at.is_(None)).order_by(User.created_at)).all()
+    return [{"user_id": u.user_id, "tenant_id": u.tenant_id, "email": u.email, "full_name": u.full_name, "role": u.role.name} for u in users]
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
@@ -144,5 +167,4 @@ def list_comments(task_id: UUID, db: Session = Depends(get_db), user: User = Dep
 @router.get("/audit-logs")
 def list_audit_logs(db: Session = Depends(get_db), user: User = Depends(require_roles("Owner", "Admin"))):
     stmt = select(AuditLog).join(User, AuditLog.user_id == User.user_id).where(User.tenant_id == user.tenant_id).order_by(AuditLog.created_at.desc())
-    logs = db.scalars(stmt).all()
-    return logs
+    return db.scalars(stmt).all()

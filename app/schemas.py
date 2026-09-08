@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -10,7 +11,7 @@ class RegisterRequest(BaseModel):
     tenant_name: str = Field(min_length=2, max_length=120)
     full_name: str = Field(min_length=2, max_length=120)
     email: str = Field(min_length=3, max_length=255)
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=8, max_length=72)
 
 
 class LoginRequest(BaseModel):
@@ -21,6 +22,13 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class UserCreate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=72)
+    role: Literal["Admin", "Member"] = "Member"
 
 
 class UserResponse(BaseModel):
