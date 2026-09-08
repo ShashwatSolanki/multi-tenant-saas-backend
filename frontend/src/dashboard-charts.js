@@ -37,11 +37,14 @@ const chart = (title, subtitle, rows) => `
     </div>
   </section>`;
 
+let analyticsLoading = false;
+
 async function renderAnalytics() {
   const main = document.querySelector('.main');
   const stats = document.querySelector('.stats');
-  if (!main || !stats || document.querySelector('.aegis-analytics')) return;
+  if (!main || !stats || document.querySelector('.aegis-analytics') || analyticsLoading) return;
 
+  analyticsLoading = true;
   try {
     const [projects, users] = await Promise.all([api('/projects'), api('/users')]);
     const taskLists = await Promise.all(projects.map(project => api(`/projects/${project.project_id}/tasks`)));
@@ -65,6 +68,8 @@ async function renderAnalytics() {
     stats.insertAdjacentElement('afterend', analytics);
   } catch (_) {
     // Analytics are supplementary; never interfere with the main dashboard.
+  } finally {
+    analyticsLoading = false;
   }
 }
 
@@ -74,6 +79,3 @@ const observer = new MutationObserver(() => {
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
-setInterval(() => {
-  if (document.querySelector('.stats') && !document.querySelector('.aegis-analytics')) renderAnalytics();
-}, 10000);
