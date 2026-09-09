@@ -134,18 +134,6 @@ Services:
 
 Open the frontend, register a workspace, and sign in as the Owner.
 
-### Suggested demo flow
-
-1. Register a workspace.
-2. Add an Admin and Member from **Team & roles**.
-3. Create a project with a description and manager.
-4. Add project members and create tasks with priority, assignee and collaborators.
-5. Use the dashboard analytics to show task status, priority, project lifecycle and team status.
-6. Demonstrate Member visibility and task permissions with the Member account.
-7. Archive a project and demonstrate its read-only behavior.
-8. Open **Tenant verification** and verify the authenticated tenant context.
-9. Open **Audit logs** as Owner/Admin.
-
 ## Run Backend Without Docker
 
 Create a virtual environment, install dependencies, and configure `.env` from `.env.example`.
